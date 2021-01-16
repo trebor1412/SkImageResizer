@@ -53,30 +53,40 @@ namespace SkImageResizer
                 Directory.CreateDirectory(destPath);
             }
 
-            await Task.Yield();
-
             var allFiles = FindImages(sourcePath);
+            var taskList = new List<Task> { };
             foreach (var filePath in allFiles)
             {
-                var bitmap = SKBitmap.Decode(filePath);
-                var imgPhoto = SKImage.FromBitmap(bitmap);
-                var imgName = Path.GetFileNameWithoutExtension(filePath);
+                taskList.Add(ResizeSingleImageAsync(filePath, destPath, scale));
+            }
 
-                var sourceWidth = imgPhoto.Width;
-                var sourceHeight = imgPhoto.Height;
+            await Task.WhenAll(taskList);
+        }
 
-                var destinationWidth = (int)(sourceWidth * scale);
-                var destinationHeight = (int)(sourceHeight * scale);
+        private async Task ResizeSingleImageAsync(string filePath, string destPath, double scale)
+        {
+            var imgName = Path.GetFileNameWithoutExtension(filePath);
+            var bitmap = await Task.Run(() => SKBitmap.Decode(filePath));
+            var imgPhoto = await Task.Run(() => SKImage.FromBitmap(bitmap));
 
-                using var scaledBitmap = bitmap.Resize(
-                    new SKImageInfo(destinationWidth, destinationHeight),
-                    SKFilterQuality.High);
-                using var scaledImage = SKImage.FromBitmap(scaledBitmap);
-                using var data = scaledImage.Encode(SKEncodedImageFormat.Jpeg, 100);
+            var sourceWidth = imgPhoto.Width;
+            var sourceHeight = imgPhoto.Height;
+
+            var destinationWidth = (int)(sourceWidth * scale);
+            var destinationHeight = (int)(sourceHeight * scale);
+
+            using var scaledBitmap = await Task.Run(() => bitmap.Resize(new SKImageInfo(destinationWidth, destinationHeight), SKFilterQuality.High));
+
+            using var scaledImage = await Task.Run(() => SKImage.FromBitmap(scaledBitmap));
+            using var data = await Task.Run(() => scaledImage.Encode(SKEncodedImageFormat.Jpeg, 100));
+
+            await Task.Run(() =>
+            {
                 using var s = File.OpenWrite(Path.Combine(destPath, imgName + ".jpg"));
                 data.SaveTo(s);
-            }
+            });
         }
+
 
         /// <summary>
         /// 清空目的目錄下的所有檔案與目錄
