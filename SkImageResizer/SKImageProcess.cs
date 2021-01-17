@@ -61,33 +61,35 @@ namespace SkImageResizer
             }
 
             await Task.WhenAll(taskList);
-            
+            if (token.IsCancellationRequested)
+            {
+                Clean(destPath);
+            }
         }
 
         private async Task ResizeSingleImageAsync(string filePath, string destPath, double scale, CancellationToken token = default)
         {
-            var imgName = Path.GetFileNameWithoutExtension(filePath);
-            var bitmap = await Task.Run(() => SKBitmap.Decode(filePath));            
-            var imgPhoto = await Task.Run(() => SKImage.FromBitmap(bitmap));
-
-            var sourceWidth = imgPhoto.Width;
-            var sourceHeight = imgPhoto.Height;
-
-            var destinationWidth = (int)(sourceWidth * scale);
-            var destinationHeight = (int)(sourceHeight * scale);
-
-            using var scaledBitmap = await Task.Run(() => bitmap.Resize(new SKImageInfo(destinationWidth, destinationHeight), SKFilterQuality.High));
-
-            using var scaledImage = await Task.Run(() => SKImage.FromBitmap(scaledBitmap));
-            using var data = await Task.Run(() => scaledImage.Encode(SKEncodedImageFormat.Jpeg, 100));
-            if (token.IsCancellationRequested)
-            {
-                Clean(destPath);
-                return;
-            }
-
             await Task.Run(() =>
             {
+                var imgName = Path.GetFileNameWithoutExtension(filePath);
+                var bitmap = SKBitmap.Decode(filePath);
+                var imgPhoto = SKImage.FromBitmap(bitmap);
+
+                var sourceWidth = imgPhoto.Width;
+                var sourceHeight = imgPhoto.Height;
+
+                var destinationWidth = (int)(sourceWidth * scale);
+                var destinationHeight = (int)(sourceHeight * scale);
+
+                using var scaledBitmap = bitmap.Resize(new SKImageInfo(destinationWidth, destinationHeight), SKFilterQuality.High);
+
+                using var scaledImage = SKImage.FromBitmap(scaledBitmap);
+                using var data = scaledImage.Encode(SKEncodedImageFormat.Jpeg, 100);
+
+                if (token.IsCancellationRequested)
+                {
+                    return;
+                }
                 using var s = File.OpenWrite(Path.Combine(destPath, imgName + ".jpg"));
                 data.SaveTo(s);
             });
