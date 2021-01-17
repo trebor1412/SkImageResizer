@@ -46,7 +46,7 @@ namespace SkImageResizer
             }
         }
 
-        public async Task ResizeImagesAsync(string sourcePath, string destPath, double scale)
+        public async Task ResizeImagesAsync(string sourcePath, string destPath, double scale, CancellationToken token)
         {
             if (!Directory.Exists(destPath))
             {
@@ -57,10 +57,15 @@ namespace SkImageResizer
             var taskList = new List<Task> { };
             foreach (var filePath in allFiles)
             {
+                
                 taskList.Add(ResizeSingleImageAsync(filePath, destPath, scale));
             }
 
             await Task.WhenAll(taskList);
+            if (token.IsCancellationRequested)
+            {
+                Clean(destPath);
+            }
         }
 
         private async Task ResizeSingleImageAsync(string filePath, string destPath, double scale)
