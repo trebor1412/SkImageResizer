@@ -46,7 +46,7 @@ namespace SkImageResizer
             }
         }
 
-        public async Task ResizeImagesAsync(string sourcePath, string destPath, double scale, CancellationToken token)
+        public async Task ResizeImagesAsync(string sourcePath, string destPath, double scale, CancellationToken token = default)
         {
             if (!Directory.Exists(destPath))
             {
@@ -56,22 +56,18 @@ namespace SkImageResizer
             var allFiles = FindImages(sourcePath);
             var taskList = new List<Task> { };
             foreach (var filePath in allFiles)
-            {
-                
-                taskList.Add(ResizeSingleImageAsync(filePath, destPath, scale));
+            {               
+                taskList.Add(ResizeSingleImageAsync(filePath, destPath, scale, token));
             }
 
             await Task.WhenAll(taskList);
-            if (token.IsCancellationRequested)
-            {
-                Clean(destPath);
-            }
+            
         }
 
-        private async Task ResizeSingleImageAsync(string filePath, string destPath, double scale)
+        private async Task ResizeSingleImageAsync(string filePath, string destPath, double scale, CancellationToken token = default)
         {
             var imgName = Path.GetFileNameWithoutExtension(filePath);
-            var bitmap = await Task.Run(() => SKBitmap.Decode(filePath));
+            var bitmap = await Task.Run(() => SKBitmap.Decode(filePath));            
             var imgPhoto = await Task.Run(() => SKImage.FromBitmap(bitmap));
 
             var sourceWidth = imgPhoto.Width;
@@ -84,6 +80,11 @@ namespace SkImageResizer
 
             using var scaledImage = await Task.Run(() => SKImage.FromBitmap(scaledBitmap));
             using var data = await Task.Run(() => scaledImage.Encode(SKEncodedImageFormat.Jpeg, 100));
+            if (token.IsCancellationRequested)
+            {
+                Clean(destPath);
+                return;
+            }
 
             await Task.Run(() =>
             {
